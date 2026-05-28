@@ -1,137 +1,130 @@
-# mock_cluster_buzzard — Buzzard mock with optical selection effects
+# mock_cluster_buzzard — Buzzard cluster mock with optical-selection effects
 
-Forward model for a DES-Y3-like cluster data vector built on Buzzard
-halos, with the Costanzi et al. 2026 optical-selection systematics
-layered on. Produces:
+Forward model for a DES Y3-like cluster data vector built on Buzzard halos,
+with the Costanzi+2026 (C26) optical-selection systematics layered on. The
+notebook constructs the lensing data vector along **two parallel routes**
+that live on the same DES Y1 binning, so a downstream user can compare
+them directly:
 
-1. `N(λ_obs, z)` — observed cluster number counts.
-2. `γ_obs(R, λ_obs-bin, z-bin)` — `B_sel`-weighted stacked tangential shear
-   (and the matching `ΔΣ` stacks for reference).
+- **Analytical (Matteo / C26 Eq. C1).** Bin halos on the C19 forward-model
+  $(\lambda^\mathrm{ob}, z^\mathrm{ob})$ — kernel-driven, no per-halo LSS
+  information — then apply the C26 Appendix C fitting function
+  $\mathcal{B}^{\Delta\Sigma}_\mathrm{C1}(R)$ to the stacked $\Delta\Sigma$.
+  Five constants per richness/redshift bin, no integration. Cheap enough
+  for an MCMC chain.
+- **Empirical (Heidi / mass-matched ratio).** Bin halos on the catalog
+  redMaPPer outputs $(\texttt{LAMBDA\_CHISQ}, \texttt{Z\_LAMBDA})$ — these
+  carry per-halo LSS information — then divide by a
+  $(\log M, z_\mathrm{true})$-matched random reference (Wu+2022 method
+  iii). No fitting function, both numerator and denominator come straight
+  from `mock['DeltaSigma']`.
 
-Boost-factor contamination is **not** included in this pass (future work).
+Both routes share the same C19 forward model upstream (mass–richness +
+projection kernel) and the same lensing geometry $\Sigma_\mathrm{crit}^{-1}(z_l)$.
 
-## Schematic
+Boost-factor contamination is **not** modelled yet (deferred work).
 
-```
-  raw halos + profiles (fitsio.read floc.halo_run_fname,
-                                    floc.profile_output_fname)
-        |  select_good (pid==-1, cosi∈[0,1], drop 0.33≤z≤0.37 seam)
-        |  + 0.2 ≤ z ≤ 0.65, log10 M_vir ≥ 13   (mirror 0-MakeMock.ipynb)
-        v
-  halo table: Mvir, M200m, redshift, RA, DEC, DeltaSigma[15]
-        |
-        |  ---- Costanzi 2026 Eq. 15  (compound Poisson + lognormal) ----
-        |        <λ_true | M, z> = 1 + ((M - M_min)/M_pivot)^α
-        |                             × ((1+z)/(1+z_piv))^ε
-        |        λ_true ~ pltr_M(λ | M, z)
-        v
-  λ_true per halo
-        |
-        |  ---- P(λ_obs | λ_true, z)  (δ + positive exponential) ----
-        |        with prob (1−f_prj) →  λ_obs = λ_true
-        |        else                →  λ_obs = λ_true + Exp(1/τ)
-        |        f_prj(λ_true,z), τ(λ_true,z) from
-        |        prj_params_DESY3_lss_lin_dep_getdist_v1.txt (posterior mean)
-        v
-  λ_obs per halo  ──────────► OUTPUT 1: N(λ_obs, z)
-        |
-        |  ---- B_sel weight (one-halo / small-scale limit, App. C) ----
-        |        <Δ_prj | λ_obs, z>  ≡  f_prj / τ
-        |        w_i = 1 + ((λ_obs_i − λ_true_i) − <Δ_prj>) / <Δ_prj>
-        |        (population mean over δ+exp mixture → 1)
-        v
-  γ_mock_i(R) = ΔΣ_i(R) × Σ_crit^{-1}(z_i)    (β_eff table, same as
-                                                  createDataVector.ipynb)
-        |
-        |  ---- weighted stack over (λ_obs, z) bin ----
-        |        γ_obs(R) = Σ_i w_i γ_mock_i(R) / Σ_i w_i
-        v
-  γ_obs(R, λ_obs-bin, z-bin) ───► OUTPUT 2
-```
+## Outputs
 
-## Parameters (DES-Y1 NC + 3×2pt best fit, Costanzi notebook defaults)
+Saved by the final notebook cell to `output/Xin_MockDataVector.npz`. With
+$N_\lambda = 4$, $N_z = 3$, $N_R = 15$:
 
-Hard-coded in `costanzi_selection.py`.
+| key                  | shape       | meaning                                                            |
+|----------------------|-------------|--------------------------------------------------------------------|
+| `NC`                 | $(4, 3)$    | $N(\lambda^\mathrm{ob}, z^\mathrm{ob})$ number counts             |
+| `gamma_t_stack_C19`  | $(4, 3, 15)$| analytical: stacked $\gamma_t$, no correction                     |
+| `gamma_t_obs_C1`     | $(4, 3, 15)$| analytical: stack $\times \mathcal{B}^{\Delta\Sigma}_\mathrm{C1}$ |
+| `B_sel_C1`           | $(4, 3, 15)$| analytical: $\mathcal{B}^{\Delta\Sigma}_\mathrm{C1}(R)$           |
+| `gamma_t_stack_RM`   | $(4, 3, 15)$| empirical: $(\log M, z)$-matched random reference                 |
+| `gamma_t_obs_RM`     | $(4, 3, 15)$| empirical: redMaPPer-selected stack                               |
+| `B_sel_emp`          | $(4, 3, 15)$| empirical: bootstrap-mean $\mathcal{B}_\mathrm{sel}^\mathrm{emp}(R)$ |
 
-| Symbol       | Value                              |
-|--------------|------------------------------------|
-| `M_min`      | 10^11.38528 M_⊙                    |
-| `α`          | 0.85869                            |
-| `M_1`        | 10^12.69644 M_⊙                    |
-| `M_pivot`    | M_1 − M_min                        |
-| `σ_intr`     | 0.18095                            |
-| `ε`          | 0.28389                            |
-| `z_piv`      | 0.4544                             |
+Plus bin metadata: `radii_phys_mpc`, `lambda_bins`, `z_bin_min`, `z_bin_max`.
 
-Projection coefficients (`a_tau, b_tau, a_fprj, b_fprj, …`) are loaded as
-the posterior mean of the 15 rows in
-`prj_params_DESY3_lss_lin_dep_getdist_v1.txt` (downloaded from
+The headline plots are also written to `output/figs/` as PNGs and embedded
+in `docs/Xin_MockDataVector.pdf`.
+
+## Binning (DES Y1)
+
+Both number counts and the lensing data vector use the DES Y1 cluster
+binning (Costanzi+2019, McClintock+2019):
+
+- `LBDBINS   = [20, 30, 45, 60, 500]` (4 richness bins; the 500 caps
+  $[60, \infty)$).
+- `ZMIN_LIST = [0.20, 0.35, 0.50]`, `ZMAX_LIST = [0.35, 0.50, 0.65]`.
+
+Halo selection mirrors `0-MakeMock.ipynb`: `pid == -1`, $0 \le \cos i \le 1$,
+drop the Buzzard $0.33 \le z < 0.37$ box seam, then require
+$0.20 \le z \le 0.65$ and $\log_{10} M_\mathrm{vir} \ge 13$. Yields
+$\sim 5.83 \times 10^5$ halos.
+
+## DES-Y1 NC+3×2pt mass–richness parameters
+
+Hard-coded in `src/costanzi_selection.py`.
+
+| Symbol     | Value             |
+|------------|-------------------|
+| `M_min`    | $10^{11.385}\,M_\odot$ |
+| `α`        | 0.859             |
+| `M_1`      | $10^{12.696}\,M_\odot$ |
+| `M_pivot`  | $M_1 - M_\mathrm{min}$ |
+| `σ_intr`   | 0.181             |
+| `ε`        | 0.284             |
+| `z_piv`    | 0.4544            |
+
+Projection coefficients ($a_\tau, b_\tau, a_{f_\mathrm{prj}}, b_{f_\mathrm{prj}}, \dots$)
+are loaded as the posterior mean of the 15 rows in
+`data/prj_params_DESY3_lss_lin_dep_getdist_v1.txt` (downloaded from
 `MCostanzi/SelectionBias`).
 
-## Key equations (verify against the PDF)
+## Notebook structure
 
-- **Eq. 15 (mass-richness mean + scatter)**:
-  `<λ_true | M, z> = 1 + [(M - M_min)/M_pivot]^α  [(1+z)/(1+z_piv)]^ε`,
-  scatter `σ_intr · l_sat(M,z)`, compound Poisson + lognormal P(λ_true|M,z).
-
-- **Projection convolution** (δ + positive exponential mixture):
-  `P(λ_obs | λ_true, z) = (1 − f_prj) δ_D(λ_obs − λ_true)
-                         + f_prj · τ · e^{−τ(λ_obs − λ_true)} Θ_H(λ_obs − λ_true)`.
-
-- **Eq. C.1 (selection-bias weight, single-scale limit)**:
-  `B_sel(λ_obs, λ_true, z) = 1 + (Δ_prj − <Δ_prj>) / <Δ_prj>`, with
-  `<Δ_prj>(λ_obs, z) = f_prj / τ` and `Δ_prj = max(λ_obs − λ_true, 0)`.
-  The full scale-dependent Costanzi form (with `eff_bias_ltr` and
-  `bar_delta_prj_Beff`) is **not** implemented here — see "Known
-  simplifications" below.
-
-Copy the exact equation numbering/text from the PDF into this section
-before circulating.
-
-## Binning
-
-Match the edges already used by `createDataVector.ipynb`:
-
-- `LBDBINS = [5, 15, 25, 40, 160]` (4 λ_obs bins).
-- `ZMIN_LIST = [0.20, 0.37, 0.51]`, `ZMAX_LIST = [0.32, 0.51, 0.64]`
-  (3 redshift bins; avoids the Buzzard 0.33–0.37 seam).
-
-These are the bin edges a future Costanzi fit should adopt; feel free to
-retune once you have Y1-style λ distributions from this mock.
+| Section | Content |
+|---|---|
+| §1 | Inputs (cosmology, DES Y1 binning, RNG seed) |
+| §2 | Load halo catalogue + per-halo $\Sigma$, $\Delta\Sigma$ profiles; photo-$z$ proxy |
+| §3 | Sample $\lambda_\mathrm{true}$ from C26 Eq. 15 |
+| §4 | Project $\lambda_\mathrm{true} \to \lambda_\mathrm{obs}$ via C19 Eq. 6 mixture |
+| §4.5 | Stacked $\Sigma$ in $\lambda^\mathrm{tr}$ vs $\lambda^\mathrm{ob}$ bins (mass-dilution diagnostic) |
+| §5 | Output 1 — $N(\lambda_\mathrm{obs}, z_\mathrm{obs})$ |
+| §5.5 | Sanity: C19 sampler $\lambda^\mathrm{ob}$ vs catalog `LAMBDA_CHISQ` |
+| §6 | Halo mass function: Buzzard vs analytical Tinker08 |
+| **§7** | **Lensing data vector — ANALYTICAL route (C26 Eq. C1)** |
+| §7.1 | Selection-bias ratio $\mathcal{B}^{\Delta\Sigma}_\mathrm{C1}(R)$ |
+| §7.2 | Tangential shear, with vs without C1 correction |
+| **§8** | **Lensing data vector — EMPIRICAL route (mass-matched ratio)** |
+| §8.1 | Selection-bias ratio $\mathcal{B}_\mathrm{sel}^\mathrm{emp}(R)$ with bootstrap bands; null test |
+| §8.2 | Tangential shear: redMaPPer-selected vs mass-matched random |
+| §9 | Save the data vector to `output/Xin_MockDataVector.npz` |
 
 ## How to run
 
-1. On NERSC Perlmutter, launch Jupyter with the `desc-python` kernel:
-   ```
-   ssh $NERSC && module load python && source activate desc-python
-   jupyter lab
-   ```
-   (Or use jupyter.nersc.gov and pick `desc-python`.)
-
-2. Open `Xin_MockDataVector.ipynb` (at the repo root) and run top to
-   bottom. Expected wall-clock time: a few minutes. The first cell
-   adds `src/` to `sys.path` so the helper modules import directly.
-
-3. Output:
-   `floc.mock_fname`-sibling file
-   `dataVec_mock_buzzard_xin_v0.hdf5` with groups `NC`, `GT`, `params`.
+1. Open `Xin_MockDataVector.ipynb` (at the repo root) and run top to
+   bottom. The first cell adds `src/` to `sys.path` so the helper
+   modules import directly. Expected wall-clock time: a few minutes
+   (the §8.1 bootstrap of the mass-matched reference is the slow part).
+2. Outputs land in `output/Xin_MockDataVector.npz` plus headline plots
+   in `output/figs/`.
 
 ## Repository layout
 
 ```
 mock_cluster_buzzard/
 ├── README.md
-├── Xin_MockDataVector.ipynb     ← main entry, run top to bottom
-├── src/                         ← Python helpers (added to sys.path by the notebook)
-│   ├── costanzi_selection.py    ← C26 Eq. 15 sampler + C19 Eq. 6 mixture
+├── Xin_MockDataVector.ipynb        ← main entry, run top to bottom
+├── src/                            ← Python helpers (added to sys.path by the notebook)
+│   ├── costanzi_selection.py       ← C26 Eq. 15 sampler + C19 Eq. 6 mixture
 │   ├── stacked_profile_weighted_by_mass_redshift.py  ← Wu+22 (M, z) match
-│   ├── radial_bins_phys_mpc.py  ← rp_phys_mpc 15-bin radial grid
-│   └── fileLoc.py               ← machine-resolved paths to Buzzard inputs
+│   ├── radial_bins_phys_mpc.py     ← rp_phys_mpc 15-bin radial grid
+│   └── fileLoc.py                  ← machine-resolved paths to Buzzard inputs
 ├── data/
-│   └── prj_params_DESY3_lss_lin_dep_getdist_v1.txt  ← C19 projection coefs
-└── docs/
-    ├── Xin_MockDataVector.tex   ← technical reference (matches pipeline_modules.tex format)
-    └── Xin_MockDataVector.pdf   ← compiled PDF
+│   └── prj_params_DESY3_lss_lin_dep_getdist_v1.txt   ← C19 projection coefs
+├── docs/
+│   ├── Xin_MockDataVector.tex      ← technical reference
+│   └── Xin_MockDataVector.pdf      ← compiled PDF (embeds vital plots)
+└── output/                         ← produced by running the notebook
+    ├── Xin_MockDataVector.npz
+    └── figs/                       ← headline PNGs (7 figures)
 ```
 
 ## Files the notebook reads
@@ -140,52 +133,39 @@ External Buzzard inputs, all resolved via `FileLocs(machine='nersc')` in
 `src/fileLoc.py`:
 
 - `halo_run_fname` — raw halo catalogue (Mvir, z, RA, DEC, pid, cosi, …).
-- `profile_output_fname` — per-halo ΔΣ(R) profiles.
-- `mock_boost_factor_1d` → `beta_table_zl_y1_like.npz` (β_eff, z_lens
-  grid used to build Σ_crit^{-1}).
+- `profile_output_fname` — per-halo $\Sigma(R)$ and $\Delta\Sigma(R)$ profiles.
+- `mock_boost_factor_1d` → `beta_table_zl_y1_like.npz` ($\beta_\mathrm{eff}$,
+  $z_\mathrm{lens}$ grid used to build $\Sigma_\mathrm{crit}^{-1}$).
 
 Repo-local:
 
-- `data/prj_params_DESY3_lss_lin_dep_getdist_v1.txt` — Costanzi
-  posterior-sample table for the projection model.
-
-## Verification checks run in the notebook
-
-1. End-to-end execution — all cells succeed, HDF5 is written, plots render.
-2. λ_true diagnostic — `<λ_true>`, fraction `≥5`, `≥20` printed; hexbin of
-   `log λ_true` vs `log M` with the `l_tr(M, z)` mean curves overlaid at
-   z = 0.25, 0.45, 0.60.
-3. Projection conservation — `assert len(λ_obs) == len(λ_true)` (no halos
-   added or removed by the remapping).
-4. Projection tail — histogram of `λ_obs − λ_true > 0` is a decaying
-   exponential; `<Δλ>` is printed next to the predicted `<f_prj / τ>`.
-5. `B_sel` sanity — `<B_sel>` printed over all halos and over
-   `λ_obs ≥ 20`; should sit near 1 (by construction).
-6. Weight regression — `stacker.run(weights=ones)` equals the unweighted
-   mean stack (asserted with `np.allclose`).
+- `data/prj_params_DESY3_lss_lin_dep_getdist_v1.txt` — Costanzi posterior-sample
+  table for the projection model (15 rows, 10 coefficients).
 
 ## Known simplifications / deferred work
 
-- **Single-scale B_sel**: the one-halo (small-scale) limit of
-  Costanzi App. C is used. The full scale-dependent form (nested over
-  halo bias, M–λ_true joint, redshift kernel) requires the Costanzi
-  `bar_delta_prj_Beff` / `eff_bias_ltr` machinery and a radial argument
-  in the weight. Add in a follow-up.
-- **Boost-factor contamination** not modelled yet — this is the other
-  main Y3 systematic the user flagged.
-- Projection parameters use the posterior mean; row-by-row covariance
-  propagation is not done.
-- Masking fraction `f_msk` and centering mis-identification are not
-  included.
+- **Boost-factor contamination** is not modelled — the other major Y3
+  systematic on top of the optical-selection bias.
+- Projection parameters use the **posterior mean** of the C19 chain;
+  row-by-row covariance propagation is not done.
+- The photo-$z$ kernel is a Gaussian $\sigma_z = 0.01\,(1+z_\mathrm{tr})$
+  proxy rather than the full DES Y3 redshift-kernel of Myles+2021.
+- Masking fraction $f_\mathrm{msk}$ and centering mis-identification are
+  loaded but unused here.
+- The §8 empirical ratio is computed on **one** Y3 realisation; Wu+2022
+  Fig. 2 averages 12 Y1 + 1 Y3 realisations and is correspondingly
+  tighter.
 
 ## References
 
-- Costanzi et al. 2026, *Forward analytical model for the optical
-  selection bias on galaxy cluster lensing profiles*, arXiv:2604.05833.
-  Eqs. 15 (mass-richness) and C.1 (selection-bias weight) drive the
-  implementation.
+- Costanzi et al. 2026, *Forward analytical model for the optical selection
+  bias on galaxy cluster lensing profiles* (C26). Eqs. 15 (mass–richness),
+  Appendix C Eq. C1 (selection-bias fit), Sec. III (Poisson–Gaussian
+  convolution).
+- Costanzi et al. 2019, arXiv:1807.07072. Eq. 6 (Gaussian + EMG mixture),
+  Appendix A Eq. A8 (per-parameter forms).
+- Wu et al. 2022, arXiv:2203.05416. Fig. 2 (selection-bias panel grid)
+  and Appendix B (mass–redshift weighted reference).
 - `MCostanzi/SelectionBias` — upstream reference notebook and the
   `prj_params_DESY3_lss_lin_dep_getdist_v1.txt` parameter file.
-- `0-MakeMock.ipynb` — mock halo selection recipe (copied verbatim).
-- `createDataVector.ipynb` — Σ_crit construction, `compute_number_counts`,
-  and the stacking / binning scheme this notebook mirrors.
+- `0-MakeMock.ipynb` — Buzzard halo selection recipe (mirrored).
