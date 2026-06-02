@@ -13,7 +13,7 @@ them directly:
   Five constants per richness/redshift bin, no integration. Cheap enough
   for an MCMC chain.
 - **Empirical (Heidi / mass-matched ratio).** Bin halos on the catalog
-  redMaPPer outputs $(\texttt{LAMBDA\_CHISQ}, \texttt{Z\_LAMBDA})$ — these
+  redMaPPer outputs $(\mathtt{LAMBDA\_CHISQ}, \mathtt{Z\_LAMBDA})$ — these
   carry per-halo LSS information — then divide by a
   $(\log M, z_\mathrm{true})$-matched random reference (Wu+2022 method
   iii). No fitting function, both numerator and denominator come straight
@@ -26,7 +26,7 @@ Boost-factor contamination is **not** modelled yet (deferred work).
 
 ## Outputs
 
-Saved by the final notebook cell to `output/Xin_MockDataVector.npz`. With
+Saved by the final notebook cell to `output/MockDataVector.npz`. With
 $N_\lambda = 4$, $N_z = 3$, $N_R = 15$:
 
 | key                  | shape       | meaning                                                            |
@@ -42,7 +42,7 @@ $N_\lambda = 4$, $N_z = 3$, $N_R = 15$:
 Plus bin metadata: `radii_phys_mpc`, `lambda_bins`, `z_bin_min`, `z_bin_max`.
 
 The headline plots are also written to `output/figs/` as PNGs and embedded
-in `docs/Xin_MockDataVector.pdf`.
+in `docs/MockDataVector.pdf`.
 
 ## Binning (DES Y1)
 
@@ -95,15 +95,15 @@ are loaded as the posterior mean of the 15 rows in
 | **§8** | **Lensing data vector — EMPIRICAL route (mass-matched ratio)** |
 | §8.1 | Selection-bias ratio $\mathcal{B}_\mathrm{sel}^\mathrm{emp}(R)$ with bootstrap bands; null test |
 | §8.2 | Tangential shear: redMaPPer-selected vs mass-matched random |
-| §9 | Save the data vector to `output/Xin_MockDataVector.npz` |
+| §9 | Save the data vector to `output/MockDataVector.npz` |
 
 ## How to run
 
-1. Open `Xin_MockDataVector.ipynb` (at the repo root) and run top to
+1. Open `MockDataVector.ipynb` (at the repo root) and run top to
    bottom. The first cell adds `src/` to `sys.path` so the helper
    modules import directly. Expected wall-clock time: a few minutes
    (the §8.1 bootstrap of the mass-matched reference is the slow part).
-2. Outputs land in `output/Xin_MockDataVector.npz` plus headline plots
+2. Outputs land in `output/MockDataVector.npz` plus headline plots
    in `output/figs/`.
 
 ## Repository layout
@@ -111,7 +111,7 @@ are loaded as the posterior mean of the 15 rows in
 ```
 mock_cluster_buzzard/
 ├── README.md
-├── Xin_MockDataVector.ipynb        ← main entry, run top to bottom
+├── MockDataVector.ipynb        ← main entry, run top to bottom
 ├── src/                            ← Python helpers (added to sys.path by the notebook)
 │   ├── costanzi_selection.py       ← C26 Eq. 15 sampler + C19 Eq. 6 mixture
 │   ├── stacked_profile_weighted_by_mass_redshift.py  ← Wu+22 (M, z) match
@@ -120,10 +120,10 @@ mock_cluster_buzzard/
 ├── data/
 │   └── prj_params_DESY3_lss_lin_dep_getdist_v1.txt   ← C19 projection coefs
 ├── docs/
-│   ├── Xin_MockDataVector.tex      ← technical reference
-│   └── Xin_MockDataVector.pdf      ← compiled PDF (embeds vital plots)
+│   ├── MockDataVector.tex      ← technical reference
+│   └── MockDataVector.pdf      ← compiled PDF (embeds vital plots)
 └── output/                         ← produced by running the notebook
-    ├── Xin_MockDataVector.npz
+    ├── MockDataVector.npz
     └── figs/                       ← headline PNGs (7 figures)
 ```
 

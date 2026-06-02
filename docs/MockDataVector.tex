@@ -12,6 +12,7 @@
 \usepackage{float}
 \usepackage{multirow}
 \usepackage{caption}
+\usepackage{verbatim}  % provides \begin{comment}...\end{comment}
 
 % Preferred style -------------------------------------------------------------
 \definecolor{harvardcrimson}{HTML}{8C1D40}
@@ -72,12 +73,12 @@
 
 \begin{abstract}
 This document is the technical reference for
-\modname{Xin\_MockDataVector.ipynb}: a Buzzard-halo DES~Y3-like cluster
+\modname{MockDataVector.ipynb}: a Buzzard-halo DES~Y3-like cluster
 mock that layers the Costanzi+2026 (C26) optical selection systematics on
 top of the raw simulation outputs, on the DES~Y1 cluster binning
 ($\lambda \in \{20, 30, 45, 60, \infty\}$,
 $z \in \{0.20, 0.35, 0.50, 0.65\}$). The data vector is constructed along
-\emph{two parallel routes} that share the same C19 forward model upstream
+\emph{two parallel routes} that share the same Costanzi+2019 (C19) forward model upstream
 and the same lensing geometry: an \textbf{analytical} closure based on the
 C26 Appendix~C Eq.~C1 fitting function applied to the C19-binned stack
 (cheap enough for an MCMC chain), and an \textbf{empirical} ratio that
@@ -86,7 +87,7 @@ stacks on the catalog redMaPPer outputs $(\texttt{LAMBDA\_CHISQ},
 reference (Wu+2022, Costanzi+2026). The notebook also produces a binned
 number-count vector $N(\lob, \zob)$. Boost-factor contamination is not
 included (deferred work). All outputs are saved to
-\pyfile{output/Xin\_MockDataVector.npz}; the headline plots embedded in
+\pyfile{output/MockDataVector.npz}; the headline plots embedded in
 this document live in \pyfile{output/figs/}.
 \end{abstract}
 
@@ -118,7 +119,7 @@ $\Sigma_{\rm crit}^{-1}$ table, plus the catalog redMaPPer columns
 The two lensing-data-vector stages are independent and produce their
 outputs on the same DES~Y1 binning so the user can compare them
 side-by-side. The final stage persists everything to
-\pyfile{output/Xin\_MockDataVector.npz}.
+\pyfile{output/MockDataVector.npz}.
 
 % ============================================================================
 \section{Shared conventions}
@@ -213,9 +214,19 @@ Gaussian-core $+$ exponentially-modified-Gaussian (EMG) mixture:
   = (1 - f_{\rm prj})\, \mathcal N(\mu, \sigma)
        + f_{\rm prj}\, \mathrm{EMG}(\mu, \sigma, \tau).
 \end{equation}
-The four parameters $\{\mu, \sigma, \tau, f_{\rm prj}\}$ depend linearly on
-$\ltr$ with $z$-dependent coefficients (C19 Appendix~A, Eq.~A8); the 15
-rows of \pyfile{data/prj\_params\_DESY3\_lss\_lin\_dep\_getdist\_v1.txt}
+The four parameters $\{\mu, \sigma, \tau, f_{\rm prj}\}$ depend on
+$\ltr$ with $z$-dependent coefficients calibrated from SDSS redMaPPer
+(C19 Appendix~A, Eq.~A8):
+\begin{equation}
+\label{eq:c19-a8}
+\begin{aligned}
+  \mu(\ltr, z)         &= a_\mu(z) + b_\mu(z)\,\ltr,
+  & \sigma(\ltr, z)     &= b_\sigma(z)\,(\ltr)^{a_\sigma(z)}, \\
+  \tau(\ltr, z)        &= b_\tau(z)\,(\ltr)^{-a_\tau(z)},
+  & f_{\rm prj}(\ltr, z)&= b_{f_{\rm prj}}(z)\,\big(1 + e^{-\ltr}\big)^{-a_{f_{\rm prj}}(z)}.
+\end{aligned}
+\end{equation}
+The 15 rows of \pyfile{data/prj\_params\_DESY3\_lss\_lin\_dep\_getdist\_v1.txt}
 are interpreted as posterior samples and collapsed to the posterior mean
 via \texttt{load\_prj\_posterior\_mean}.
 
@@ -233,14 +244,16 @@ Poisson noise.
 \centering
 \includegraphics[width=0.55\linewidth]{../output/figs/01_projection_kernel_mc_vs_pdf.png}
 \caption{MC draws of $\lob$ from \texttt{sample\_lambda\_obs} (blue
-histograms) overlaid with the closed-form C19 Eq.~6 PDF (red dashed) at
-three reference redshifts and three intrinsic richnesses. The two agree
-within Poisson noise across the bulk and the tail.}
+histograms) overlaid with the closed-form PDF of
+Eq.~\ref{eq:c19-eq6} (red dashed) at three reference redshifts and
+three intrinsic richnesses. The two agree within Poisson noise across
+the bulk and the tail.}
 \label{fig:mc-vs-pdf}
 \end{figure}
 
 \paragraph{Sanity check 2 --- Gaussian core + EMG tail decomposition.}
-Same Eq.~6 kernel, split into the two physical components. At large $\ltr$
+Same kernel as Eq.~\ref{eq:c19-eq6}, split into the two physical
+components. At large $\ltr$
 the EMG tail dominates the high-$\lob$ side and drives the projection
 bias; this is what the analytical $\Bcal_{\rm sel,C1}$ of \S\ref{sec:c1}
 fits.
@@ -248,7 +261,7 @@ fits.
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\linewidth]{../output/figs/02_projection_decomposition.png}
-\caption{Decomposition of the C19 Eq.~6 kernel into its
+\caption{Decomposition of the kernel of Eq.~\ref{eq:c19-eq6} into its
 $(1{-}f_{\rm prj})\mathcal N$ Gaussian core (dashed) and $f_{\rm prj}\,$EMG
 projection tail (dotted) at $z = 0.4$ for four intrinsic richnesses
 $\ltr \in \{10, 30, 60, 100\}$. The EMG tail rises with $\ltr$ and drives
@@ -260,30 +273,35 @@ the optical-selection bias on the lensing data vector.}
 \section{Output 1 --- $N(\lob, \zob)$ number counts}
 \label{sec:counts}
 
-The number-counts vector is a histogram of the C19 forward-model $\lob$
-on the observed-frame $\zob$, on the DES~Y1 grid:
-\begin{equation*}
-  N_{ij}^{\rm fwd}
-  = \sum_{h} \mathbb 1\!\left[\lob_h \in [\lambda_i, \lambda_{i+1})\right]
-    \mathbb 1\!\left[\zob_h \in [z_j, z_{j+1})\right].
-\end{equation*}
-The two binning quantities ($\lob, \zob$) come from the forward model
-rather than from the catalog redMaPPer columns: the abundance side of the
-data vector lives in the C26 model world, not in the cluster-finder world.
-This is the correct entry for a C26 likelihood that integrates Eq.~15
-$\to$ Eq.~6 to predict $N(\lob, \zob)$.
+We obtain $N(\lob, \zob)$ by counting the mock halos that fall into each
+$(\lob, \zob)$ bin on the DES~Y1 grid. Both axes are forward-model
+outputs rather than catalog redMaPPer columns: the C19 sampler depends
+only on $(M, z)$ and carries no per-halo LSS information, which matches
+the inputs of the analytical $\Bcal_{\rm sel,C1}(\lob, \zob)$ of
+\S\ref{sec:c1} and keeps the abundance and lensing sides of the data
+vector in the same C26/C19 model world. $N(\lob, \zob)$ is therefore the
+correct entry for a C26 likelihood integrating
+Eq.~\ref{eq:lsat} into Eq.~\ref{eq:c19-eq6}.
 
 % ============================================================================
 \section{Lensing data vector --- ANALYTICAL route (Matteo / C26 Eq.~C1)}
 \label{sec:c1}
 
-\paragraph{Binning quantity.} The C19 forward-model
-$(\lob, \zob)$. The C19 sampler is kernel-driven and depends only on
-$(M, z)$: it carries no per-halo line-of-sight (LSS) information.
+\paragraph{Binning quantity.} The C19 forward-model $(\lob, \zob)$.
+Each $\lob$ is an independent draw from the kernel of
+Eq.~\ref{eq:c19-eq6} conditioned only on $(\ltr, z)$: the kernel
+encodes the LSS-driven projection statistics through its EMG tail at
+the population level, but per-halo $\lob$ values are not correlated
+with the actual line-of-sight structure around each halo and therefore
+carry no information correlated with the per-halo lensing signal.
 
-\paragraph{Selection bias.} The C26 Appendix~C fitting function
-(5 constants, no integration). Matteo (priv.\ comm.) reports the same form
-fits the bias on $\Delta\Sigma$:
+\paragraph{Selection bias.} redMaPPer counts red-sequence galaxies inside
+a projected aperture with no line-of-sight resolution, so projected LSS
+preferentially boosts $\lrm$ for halos in over-dense filaments and lifts
+the stacked $\Delta\Sigma(R)$ above the mass-only expectation. C26
+Appendix~C captures this lift with a 5-parameter fitting function (no
+integration); Matteo (priv.\ comm.) reports the same form fits the bias
+on $\Delta\Sigma$:
 \begin{equation}
 \label{eq:c1-form}
   \Bcal_{\rm sel,C1}^{\Delta\Sigma}(R)
@@ -307,15 +325,15 @@ both flavours for comparison. The data vector is
 with $\Delta\Sigma_{\rm stack}$ the unweighted mean of \blk{DeltaSigma}
 across the C19-binned halos in each $(\lob, \zob)$ cell.
 
-\paragraph{Why this is useful in an MCMC.} The full C26 forward model
-($\Sigma_{1h}$ via Eq.~12 $+$ $\Sigma_{\rm prj}$ via Eq.~13, then
-Wright--Brainerd to $\Delta\Sigma$) involves nested line-of-sight integrals
-through the optical-bias kernel $b_{\lob}$ (C26 Eq.~8) that are
-prohibitive at every likelihood evaluation. Equation~\eqref{eq:c1-form}
-collapses that calculation into five constants per richness/redshift bin.
+\paragraph{Why a fitting function?} An MCMC chain evaluates the lensing
+model $\sim 10^4$--$10^6$ times, so the per-step cost matters. Computing
+the full Costanzi-2026 prediction from scratch requires nested integrals
+over halo mass and redshift at every step --- prohibitive at chain
+length. Equation~\eqref{eq:c1-form} replaces those integrals with five
+constants per bin, cutting the cost from seconds to microseconds without
+changing the answer.
 
-\subsection{Selection-bias ratio $\Bcal_{\rm sel,C1}^{\Delta\Sigma}(R)$}
-\label{sec:c1-ratio}
+\paragraph{Selection-bias ratio $\Bcal_{\rm sel,C1}^{\Delta\Sigma}(R)$}
 
 The fitting function evaluated at the bin-mean $(\langle\lob\rangle,
 \langle\zob\rangle)$ for every $(\lob, \zob)$ cell, with the published
@@ -332,8 +350,8 @@ is the bias factor.}
 \label{fig:c1-ratio}
 \end{figure}
 
-\subsection{Tangential shear with vs without the C1 correction}
-\label{sec:c1-shear}
+\begin{comment}
+\paragraph{Tangential shear with vs without the C1 correction}
 
 \begin{figure}[H]
 \centering
@@ -346,7 +364,7 @@ The C1 correction lifts the data vector by $\sim 5\text{--}15\%$
 depending on bin and scale.}
 \label{fig:c1-shear}
 \end{figure}
-
+\end{comment}
 % ============================================================================
 \section{Lensing data vector --- EMPIRICAL route (Heidi / mass-matched ratio)}
 \label{sec:emp}
@@ -391,6 +409,15 @@ keeps only the bootstrap mean.
 \subsection{Selection-bias ratio $\Bsel^{\rm emp}(R)$ with bootstrap bands}
 \label{sec:emp-ratio}
 
+We evaluate $\Bsel^{\rm emp}(R)$ on the redMaPPer-binned $(\lrm, \zrm)$
+grid using Eq.~\eqref{eq:mass-match} and report the bootstrap mean and
+$1\sigma$ band per bin. The expected signature is the bell-shaped excess
+peaking near $R \sim 1$~pMpc that Wu+2022 (Fig.~2) identify as the
+LSS-environment-driven selection bias: at smaller scales the one-halo
+term dominates and the ratio approaches unity, while at larger scales
+the projected over-density that boosted $\lrm$ falls outside the lensing
+aperture and the ratio relaxes back toward one.
+
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.95\linewidth]{../output/figs/05_empirical_Bsel_emp_bootstrap.png}
@@ -424,6 +451,15 @@ Fig.~\ref{fig:emp-ratio} is genuinely LSS-driven.}
 \subsection{Tangential shear: redMaPPer-selected vs mass-matched random}
 \label{sec:emp-shear}
 
+The bias ratio of \S\ref{sec:emp-ratio} is most directly seen by
+comparing the two tangential-shear stacks that enter its numerator and
+denominator. The mass-matched random reference is the $\gamma_t$ a
+hypothetical unbiased selector would measure on halos of the same
+$(\log M, \ztr)$ distribution; the redMaPPer-selected stack is the
+$\gamma_t$ an actual cluster finder produces. Their offset is the
+observable counterpart of $\Bsel^{\rm emp}(R)$ and the quantity an MCMC
+must reproduce.
+
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.95\linewidth]{../output/figs/07_empirical_shear.png}
@@ -441,7 +477,7 @@ Fig.~\ref{fig:emp-ratio}.}
 \label{sec:archive}
 
 The final notebook cell writes both routes plus bin metadata to a single
-\pyfile{output/Xin\_MockDataVector.npz}. With $N_\lambda = 4$, $N_z = 3$,
+\pyfile{output/MockDataVector.npz}. With $N_\lambda = 4$, $N_z = 3$,
 $N_R = 15$:
 
 \begin{table}[H]
@@ -506,7 +542,7 @@ counts and $(4, 3, 15)$ for the radial vectors.}
 
 \begin{itemize}
   \setlength\itemsep{1pt}
-  \item \pyfile{Xin\_MockDataVector.ipynb} --- the production notebook.
+  \item \pyfile{MockDataVector.ipynb} --- the production notebook.
     Top-to-bottom execution reproduces every figure and writes the
     output archive.
   \item \pyfile{src/costanzi\_selection.py} --- C26 Eq.~15 sampler and
@@ -521,10 +557,10 @@ counts and $(4, 3, 15)$ for the radial vectors.}
   \item \pyfile{src/fileLoc.py} --- machine-resolved path table for the
     raw Buzzard halo catalogue, profile output, and $\beta_{\rm eff}$
     table.
-  \item \pyfile{output/Xin\_MockDataVector.npz} --- saved data vector
+  \item \pyfile{output/MockDataVector.npz} --- saved data vector
     (Tab.~\ref{tab:archive}).
   \item \pyfile{output/figs/} --- headline plots embedded in this PDF.
-  \item \pyfile{docs/Xin\_MockDataVector.tex} --- this document.
+  \item \pyfile{docs/MockDataVector.tex} --- this document.
 \end{itemize}
 
 \section{References}
