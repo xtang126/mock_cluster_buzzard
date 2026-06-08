@@ -12,3 +12,7 @@ __pycache__/
 # Stale nbconvert leftover
 MockDataVector.executed.ipynb
 *.ipynb.bak
+
+# External DES Y1 boost-factor measurements — kept locally for the notebook
+# to read, but not tracked in git (large, regenerable from the data release).
+data/boost_factor/
