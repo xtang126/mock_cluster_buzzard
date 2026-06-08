@@ -22,22 +22,30 @@ them directly:
 Both routes share the same C19 forward model upstream (mass–richness +
 projection kernel) and the same lensing geometry $\Sigma_\mathrm{crit}^{-1}(z_l)$.
 
-Boost-factor contamination is **not** modelled yet (deferred work).
+Member-galaxy contamination is injected from the published DES Y1 boost-factor
+profiles in `data/boost_factor/profiles/` (McClintock+2019); the saved final
+shear `gamma_t_mock_obs` mimics the raw uncorrected DES Y1 data vector.
 
 ## Outputs
 
 Saved by the final notebook cell to `output/MockDataVector.npz`. With
-$N_\lambda = 4$, $N_z = 3$, $N_R = 15$:
+$N_\lambda = 4$, $N_z = 3$, $N_R = 11$ (DES Y1 boost-factor R grid,
+$0.166$ to $15.80$ Mpc):
 
-| key                  | shape       | meaning                                                            |
-|----------------------|-------------|--------------------------------------------------------------------|
-| `NC`                 | $(4, 3)$    | $N(\lambda^\mathrm{ob}, z^\mathrm{ob})$ number counts             |
-| `gamma_t_stack_C19`  | $(4, 3, 15)$| analytical: stacked $\gamma_t$, no correction                     |
-| `gamma_t_obs_C1`     | $(4, 3, 15)$| analytical: stack $\times \mathcal{B}^{\Delta\Sigma}_\mathrm{C1}$ |
-| `B_sel_C1`           | $(4, 3, 15)$| analytical: $\mathcal{B}^{\Delta\Sigma}_\mathrm{C1}(R)$           |
-| `gamma_t_stack_RM`   | $(4, 3, 15)$| empirical: $(\log M, z)$-matched random reference                 |
-| `gamma_t_obs_RM`     | $(4, 3, 15)$| empirical: redMaPPer-selected stack                               |
-| `B_sel_emp`          | $(4, 3, 15)$| empirical: bootstrap-mean $\mathcal{B}_\mathrm{sel}^\mathrm{emp}(R)$ |
+| key                  | shape          | meaning                                                            |
+|----------------------|----------------|--------------------------------------------------------------------|
+| `NC`                 | $(4, 3)$       | $N(\lambda^\mathrm{ob}, z^\mathrm{ob})$, Buzzard counts rescaled by $\Omega_\mathrm{Y1}(z)$ |
+| `gamma_t_stack_C19`  | $(4, 3, 11)$   | analytical: stacked $\gamma_t$, no correction                     |
+| `gamma_t_obs_C1`     | $(4, 3, 11)$   | analytical: stack $\times \mathcal{B}^{\Delta\Sigma}_\mathrm{C1}$ |
+| `B_sel_C1`           | $(4, 3, 11)$   | analytical: $\mathcal{B}^{\Delta\Sigma}_\mathrm{C1}(R)$           |
+| `gamma_t_stack_RM`   | $(4, 3, 11)$   | empirical: $(\log M, z)$-matched random reference                 |
+| `gamma_t_obs_RM`     | $(4, 3, 11)$   | empirical: redMaPPer-selected stack                               |
+| `B_sel_emp`          | $(4, 3, 11)$   | empirical: bootstrap-mean $\mathcal{B}_\mathrm{sel}^\mathrm{emp}(R)$ |
+| `B_data`              | $(4, 3, 11)$    | DES Y1 measured boost factor $B(R)$                              |
+| `B_data_err`          | $(4, 3, 11)$    | 1-$\sigma$ error per radial bin                                  |
+| `B_data_cov`          | $(4, 3, 11, 11)$| full radial covariance matrix per bin                            |
+| `gamma_t_mock_obs_C1` | $(4, 3, 11)$    | analytical (Matteo) shear with Y1 boost dilution                 |
+| `gamma_t_mock_obs_RM` | $(4, 3, 11)$    | empirical (Heidi) shear with Y1 boost dilution                   |
 
 Plus bin metadata: `radii_phys_mpc`, `lambda_bins`, `z_bin_min`, `z_bin_max`.
 
@@ -92,6 +100,7 @@ are loaded as the posterior mean of the 15 rows in
 | **§7** | **Lensing data vector — ANALYTICAL route (C26 Eq. C1)** |
 | §7.1 | Selection-bias ratio $\mathcal{B}^{\Delta\Sigma}_\mathrm{C1}(R)$ |
 | §7.2 | Tangential shear, with vs without C1 correction |
+| §7.3 | Boost factor $B(R)$ from DES Y1 measurements; final mock-observed shear |
 | **§8** | **Lensing data vector — EMPIRICAL route (mass-matched ratio)** |
 | §8.1 | Selection-bias ratio $\mathcal{B}_\mathrm{sel}^\mathrm{emp}(R)$ with bootstrap bands; null test |
 | §8.2 | Tangential shear: redMaPPer-selected vs mass-matched random |
@@ -141,11 +150,17 @@ Repo-local:
 
 - `data/prj_params_DESY3_lss_lin_dep_getdist_v1.txt` — Costanzi posterior-sample
   table for the projection model (15 rows, 10 coefficients).
+- `data/boost_factor/profiles/full-unblind-v2-mcal-zmix_y1clust_l{l}_z{z}_zpdf_boost{,_cov}.dat`
+  — DES Y1 measured boost factor $B(R)$ profiles + radial covariance per
+  $(\lambda, z)$ bin. Used by §7.3 of the notebook.
 
 ## Known simplifications / deferred work
 
-- **Boost-factor contamination** is not modelled — the other major Y3
-  systematic on top of the optical-selection bias.
+- **Boost factor uses DES Y1, not Y3, measurements.** §7.3 injects
+  $B(R)$ from McClintock+2019 Y1 profiles, the closest released
+  measurement matching our cluster binning. A Y3 boost-factor
+  measurement is not yet released; when it is, swap files in
+  `data/boost_factor/profiles/`.
 - Projection parameters use the **posterior mean** of the C19 chain;
   row-by-row covariance propagation is not done.
 - The photo-$z$ kernel is a Gaussian $\sigma_z = 0.01\,(1+z_\mathrm{tr})$

@@ -85,8 +85,11 @@ C26 Appendix~C Eq.~C1 fitting function applied to the C19-binned stack
 stacks on the catalog redMaPPer outputs $(\texttt{LAMBDA\_CHISQ},
 \texttt{Z\_LAMBDA})$ and divides by a $(\log M, \ztr)$-matched random
 reference (Wu+2022, Costanzi+2026). The notebook also produces a binned
-number-count vector $N(\lob, \zob)$. Boost-factor contamination is not
-included (deferred work). All outputs are saved to
+number-count vector $N(\lob, \zob)$. Member-galaxy contamination
+(boost factor) is injected from the published DES~Y1 measurements
+(McClintock+2019), so the saved final shear
+$\gamma_t^{\rm mock,obs} = \Delta\Sigma_{\rm obs,C1}/B_{\rm Y1}\cdot\Sigma_{\rm crit}^{-1}$
+mimics the raw uncorrected DES~Y1 data vector. All outputs are saved to
 \pyfile{output/MockDataVector.npz}; the headline plots embedded in
 this document live in \pyfile{output/figs/}.
 \end{abstract}
@@ -152,9 +155,10 @@ The $500$ caps the open $[60, \infty)$ richness range. There are
 $N_\lambda \times N_z = 4 \times 3 = 12$ bins.
 
 \paragraph{Photo-$z$ proxy.} Per-halo Gaussian
-\begin{equation*}
+\begin{equation}
   \zob = \ztr + \sigma_z(1 + \ztr)\,\mathcal N(0, 1),\quad \sigma_z = 0.01,
-\end{equation*}
+  \label{eq:photoz-proxy}
+\end{equation}
 clipped at $\zob \ge 0.02$. Stand-in for the DES~Y3 redshift kernel of
 Myles+2021; captures the dominant scatter but not the tails.
 
@@ -168,17 +172,28 @@ bootstrap uses \texttt{seed=0}.
 \label{sec:mass-richness}
 
 \modname{Path}\,\pyfile{src/costanzi\_selection.py}
-(\texttt{l\_sat}, \texttt{l\_tr}, \texttt{sample\_lambda\_true}). The mean
-satellite richness follows C26 Eq.~15,
+(\texttt{l\_sat}, \texttt{l\_tr}, \texttt{sample\_lambda\_true}).
+
+The intrinsic richness $\ltr$ of a halo (the true number of red-sequence
+satellite galaxies hosted by the halo, plus the central galaxy) is
+modelled as a halo central plus a Poisson satellite count. The mean
+satellite count $\bar\lambda_{\rm sat}(M, z)$ follows C26 Eq.~15,
 \begin{equation}
 \label{eq:lsat}
-  \langle \lambda_{\rm sat} | M, z \rangle
+  \bar\lambda_{\rm sat}(M, z)
   = \left( \frac{M - M_{\rm min}}{M_{\rm pivot}} \right)^{\!\alpha}
         \left( \frac{1+z}{1+z_{\rm piv}} \right)^{\!\epsilon},
 \end{equation}
-clipped to zero below $M_{\rm min}$. The mean intrinsic richness is
-$\langle\ltr|M,z\rangle = 1 + \langle\lambda_{\rm sat}|M,z\rangle$ for
-$M \ge M_{\rm min}$ and zero below (C26 Sec.~III).
+clipped to zero for $M < M_{\rm min}$. The mean intrinsic richness adds
+the central galaxy when the halo is above threshold:
+\begin{equation}
+  \label{eq:ltr-mean}
+  \langle\ltr | M, z\rangle =
+  \begin{cases}
+    1 + \bar\lambda_{\rm sat}(M, z), & M \ge M_{\rm min}, \\
+    0,                                & M < M_{\rm min}.
+  \end{cases}
+\end{equation}
 
 The DES~Y1 NC$+3{\times}2$pt best-fit constants, hard-coded in
 \pyfile{src/costanzi\_selection.py}:
@@ -192,14 +207,20 @@ The DES~Y1 NC$+3{\times}2$pt best-fit constants, hard-coded in
 \end{equation*}
 with $M_{\rm pivot} = M_1 - M_{\rm min}$.
 
-The per-halo $\ltr$ is drawn from a compound Poisson with multiplicative-
-lognormal broadening of the Poisson mean (C26 Sec.~III):
+The per-halo $\ltr$ value is drawn (C26 Sec.~III) by
+\textit{(i)} broadening the Poisson rate $\bar\lambda_{\rm sat}$ with a
+multiplicative log-normal of width $\sigma_{\rm intr}$,
+\textit{(ii)} drawing an integer satellite count, and
+\textit{(iii)} adding 1 for the central galaxy if the halo is above
+$M_{\rm min}$:
 \begin{equation*}
-  m_{\rm broad} = m_{\rm sat}\,\exp\!\left[\sigma_{\rm intr}\mathcal N(0, 1)
-  - \tfrac{1}{2}\sigma_{\rm intr}^2\right],\qquad
-  N_{\rm sat} \sim \mathrm{Poisson}(m_{\rm broad}),\qquad
-  \ltr = \mathbb 1[M \ge M_{\rm min}] + N_{\rm sat}.
+  \tilde\lambda_{\rm sat} = \bar\lambda_{\rm sat}(M, z)\,
+    \exp\!\left[\sigma_{\rm intr}\,\mathcal N(0, 1)
+    - \tfrac{1}{2}\sigma_{\rm intr}^2\right],\qquad
+  N_{\rm sat} \sim \mathrm{Poisson}(\tilde\lambda_{\rm sat}),\qquad
+  \ltr = N_{\rm cen}(M) + N_{\rm sat},
 \end{equation*}
+where $N_{\rm cen}(M) = 1$ if $M \ge M_{\rm min}$ and $0$ otherwise.
 
 % ============================================================================
 \section{The projection kernel (C19 Eq.~6)}
@@ -316,12 +337,13 @@ $R_\lambda = (\lob/100)^{0.2}\,\hMpc$ (C26 Appendix~B).
 The C26 paper writes the published form for $\Sigma$ with a fixed $+1$
 rather than a free $C$ ($C = 1$ limit of Eq.~\ref{eq:c1-form}); we plot
 both flavours for comparison. The data vector is
-\begin{equation*}
+\begin{equation}
+  \label{eq:c1-data-vector}
   \Delta\Sigma_{\rm obs}(R) = \Bcal_{\rm sel,C1}^{\Delta\Sigma}(R)\,
     \Delta\Sigma_{\rm stack}(R),\qquad
   \langle \gamma_t(R) \rangle = \Delta\Sigma_{\rm obs}(R)\,
     \Sigma_{\rm crit}^{-1}\!\left(\langle\zob\rangle_{\rm bin}\right),
-\end{equation*}
+\end{equation}
 with $\Delta\Sigma_{\rm stack}$ the unweighted mean of \blk{DeltaSigma}
 across the C19-binned halos in each $(\lob, \zob)$ cell.
 
@@ -365,6 +387,54 @@ depending on bin and scale.}
 \label{fig:c1-shear}
 \end{figure}
 \end{comment}
+
+\subsection{Boost factor: member-galaxy contamination $B(R)$}
+\label{sec:boost}
+
+A real DES~Y1 measurement of $\Delta\Sigma$ is diluted by cluster-member
+galaxies that survive photo-$z$ cuts and end up in the lensing source
+catalog. These members carry no shear signal and reduce the measured
+profile by the boost factor $B(R) \equiv 1/(1 - f_{\rm cl}) \ge 1$
+(McClintock+2019 \S5.3.1). 
+\begin{align}
+B(R;\,r_s, b_0) &= 1 + b_0\,\frac{1 - f(x)}{x^2 - 1}, \qquad x = R/r_s, \nonumber \\[6pt]
+f(x) &= \begin{cases}
+\dfrac{\arctan\!\sqrt{x^2-1}}{\sqrt{x^2-1}}, & x > 1 \\[8pt]
+\dfrac{\mathrm{arctanh}\!\sqrt{1-x^2}}{\sqrt{1-x^2}}, & x < 1
+\end{cases}
+\end{align}
+
+To make the saved data vector mock the
+\emph{raw uncorrected} DES~Y1 measurement, both lensing routes have
+their final shear stack divided by $B(R)$:
+\begin{equation}
+  \langle\gamma_t\rangle^{\rm mock,obs} =
+    \frac{\langle\gamma_t\rangle^{\rm obs}}{B_{\rm Y1\,data}(R)}
+\end{equation}
+
+\paragraph{Where $B_{\rm Y1\,data}(R)$ comes from.} The DES~Y1 cluster
+analysis released measured boost-factor profiles per richness/redshift
+bin, located at \pyfile{data/boost\_factor/profiles/}
+(\texttt{full-unblind-v2-mcal-zmix\_y1clust\_l\{l\}\_z\{z\}\_zpdf\_boost.dat}).
+The files are tabulated on an 11-point physical-Mpc $R$ grid
+($0.166$ to $15.80$ Mpc); we adopt this grid as the global radial
+axis for the saved data vector. The 7 cosmology-side richness bins
+\texttt{l0..l6} include $\lambda < 20$ ranges; only \texttt{l3..l6}
+match our 4 lensing bins
+$\lambda \in \{[20, 30), [30, 45), [45, 60), [60, \infty)\}$. The
+parametric McClintock+2019 Table~B1 fit is also computed (cell~42)
+for sanity but is not used in the saved output.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\linewidth]{../output/figs/08_boost_factor_data.png}
+\caption{Measured DES~Y1 boost factor $B(R)$ per
+$(\lambda^{\rm RM}, \zrm)$ bin with reported errors. Small-$R$ amplitude
+rises with richness and falls with redshift, as expected for a
+red-sequence-driven member contamination.}
+\label{fig:boost-data}
+\end{figure}
+
 % ============================================================================
 \section{Lensing data vector --- EMPIRICAL route (Heidi / mass-matched ratio)}
 \label{sec:emp}
@@ -478,7 +548,7 @@ Fig.~\ref{fig:emp-ratio}.}
 
 The final notebook cell writes both routes plus bin metadata to a single
 \pyfile{output/MockDataVector.npz}. With $N_\lambda = 4$, $N_z = 3$,
-$N_R = 15$:
+$N_R = 11$ (DES~Y1 boost-factor profile grid):
 
 \begin{table}[H]
 \centering
@@ -488,13 +558,13 @@ $N_R = 15$:
 Key & Shape & Content \\
 \midrule
 \multicolumn{3}{l}{\textit{Bin metadata}}                                                       \\
-\blk{radii\_phys\_mpc}    & $(N_R,)$               & 15-bin physical radial grid (Mpc) \\
+\blk{radii\_phys\_mpc}    & $(N_R,)$               & 11-pt DES~Y1 boost grid (physical Mpc; $0.166$--$15.80$) \\
 \blk{lambda\_bins}        & $(N_\lambda + 1,)$     & DES~Y1 richness edges $\{20, 30, 45, 60, 500\}$ \\
 \blk{z\_bin\_min}         & $(N_z,)$               & lower-redshift edges \\
 \blk{z\_bin\_max}         & $(N_z,)$               & upper-redshift edges \\
 \midrule
-\multicolumn{3}{l}{\textit{Number counts (forward-model side)}}                                 \\
-\blk{NC}                  & $(N_\lambda, N_z)$     & $N(\lob, \zob)$ \\
+\multicolumn{3}{l}{\textit{Number counts (DES~Y1 expectation)}}                                 \\
+\blk{NC}                  & $(N_\lambda, N_z)$     & $N(\lob, \zob)$, Buzzard counts rescaled by $\Omega_{\rm Y1}(z)$ \\
 \midrule
 \multicolumn{3}{l}{\textit{Analytical route, C19-binned}}                                       \\
 \blk{gamma\_t\_stack\_C19} & $(N_\lambda, N_z, N_R)$ & stacked $\gamma_t$, no correction \\
@@ -505,6 +575,13 @@ Key & Shape & Content \\
 \blk{gamma\_t\_stack\_RM}  & $(N_\lambda, N_z, N_R)$ & $(\log M, \ztr)$-matched random reference $\gamma_t$ \\
 \blk{gamma\_t\_obs\_RM}    & $(N_\lambda, N_z, N_R)$ & $\lrm$-selected stack $\gamma_t$ (the observed signal) \\
 \blk{B\_sel\_emp}          & $(N_\lambda, N_z, N_R)$ & bootstrap-mean $\Bsel^{\rm emp}(R)$ \\
+\midrule
+\multicolumn{3}{l}{\textit{DES~Y1 boost factor + final mock-observed shears} (\S\ref{sec:boost})} \\
+\blk{B\_data}                & $(N_\lambda, N_z, N_R)$ & measured DES~Y1 $B(R)$ \\
+\blk{B\_data\_err}           & $(N_\lambda, N_z, N_R)$ & 1-$\sigma$ error per radial bin \\
+\blk{B\_data\_cov}           & $(N_\lambda, N_z, N_R, N_R)$ & full radial covariance matrix per bin \\
+\blk{gamma\_t\_mock\_obs\_C1} & $(N_\lambda, N_z, N_R)$ & analytical (Matteo) shear with Y1 boost dilution \\
+\blk{gamma\_t\_mock\_obs\_RM} & $(N_\lambda, N_z, N_R)$ & empirical (Heidi) shear with Y1 boost dilution \\
 \bottomrule
 \end{tabular}
 \caption{Output-archive layout. Default shapes are $(4, 3)$ for the
@@ -523,10 +600,12 @@ counts and $(4, 3, 15)$ for the radial vectors.}
     redshift- and colour-dependent kernel of Myles+2021. It captures
     the dominant scatter but misses the tails that drive the
     high-$z$ outlier rate.
-  \item \textbf{Boost-factor contamination} not modelled. Cluster-member
-    contamination of the source sample (Y3 boost factors) is the other
-    major Y3 lensing systematic; it stacks on top of the
-    optical-selection bias treated here.
+  \item \textbf{Boost factor uses DES~Y1, not Y3, measurements.}
+    \S\ref{sec:boost} injects $B(R)$ from McClintock+2019 Y1 profiles,
+    which is the closest released measurement matching our cluster
+    binning. A Y3 boost-factor measurement is not yet released; when
+    it is, swap the source files in \pyfile{data/boost\_factor/profiles/}
+    without further code change.
   \item \textbf{Posterior-mean projection coefficients.} The C19
     projection parameters are evaluated at the posterior mean of the
     upstream chain. Row-by-row covariance propagation is not
