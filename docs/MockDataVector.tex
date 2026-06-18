@@ -76,8 +76,11 @@ This document is the technical reference for
 \modname{MockDataVector.ipynb}: a Buzzard-halo DES~Y3-like cluster
 mock that layers the Costanzi+2026 (C26) optical selection systematics on
 top of the raw simulation outputs, on the DES~Y1 cluster binning
-($\lambda \in \{20, 30, 45, 60, \infty\}$,
-$z \in \{0.20, 0.35, 0.50, 0.65\}$). The data vector is constructed along
+($\lambda \in \{20, 30, 45, 60, \infty\}$, $z \in \{[0.20, 0.33),\,
+[0.37, 0.50),\, [0.50, 0.65)\}$ — the standard DES~Y1 redshift edges
+with the upper edge of $z_0$ pulled in from $0.35 \to 0.33$ and the
+lower edge of $z_1$ pushed out from $0.35 \to 0.37$ to skip the
+Buzzard $0.33 \le z < 0.37$ box-junction seam). The data vector is constructed along
 \emph{two parallel routes} that share the same Costanzi+2019 (C19) forward model upstream
 and the same lensing geometry: an \textbf{analytical} closure based on the
 C26 Appendix~C Eq.~C1 fitting function applied to the C19-binned stack
@@ -145,14 +148,21 @@ the $0.33 \le z < 0.37$ simulation-box seam, then require $0.20 \le \ztr
 10^5$ halos.
 
 \paragraph{DES~Y1 binning (used everywhere).} Both abundance and lensing
-bins are the DES~Y1 cluster edges (Costanzi+2019, McClintock+2019):
+bins follow the DES~Y1 cluster edges (Costanzi+2019, McClintock+2019),
+with the central two redshift edges shifted inward by $\pm 0.02$ to
+skip the Buzzard box-junction seam at $0.33 \le z < 0.37$:
 \begin{equation*}
   \texttt{LBDBINS}    = \{20,\, 30,\, 45,\, 60,\, 500\},\qquad
-  \texttt{ZMIN\_LIST} = \{0.20,\, 0.35,\, 0.50\},\qquad
-  \texttt{ZMAX\_LIST} = \{0.35,\, 0.50,\, 0.65\}.
+  \texttt{ZMIN\_LIST} = \{0.20,\, 0.37,\, 0.50\},\qquad
+  \texttt{ZMAX\_LIST} = \{0.33,\, 0.50,\, 0.65\}.
 \end{equation*}
 The $500$ caps the open $[60, \infty)$ richness range. There are
-$N_\lambda \times N_z = 4 \times 3 = 12$ bins.
+$N_\lambda \times N_z = 4 \times 3 = 12$ bins. The seam volume is
+$\sim 5\%$ of $z_0$ and $\sim 13\%$ of $z_1$ on the published Y1
+edges; pulling the bin edges inward eliminates the bias on $N(\lob,
+\zob)$ at the cost of a small mismatch with the Y1-published bin
+ranges (negligible on $B_\mathrm{sel}$, $B_\mathrm{data}$, and the
+shear data vector since these are intensive quantities).
 
 \paragraph{Photo-$z$ proxy.} Per-halo Gaussian
 \begin{equation}
@@ -379,7 +389,7 @@ is the bias factor.}
 \centering
 \includegraphics[width=0.95\linewidth]{../output/figs/04_analytical_shear_with_C1.png}
 \caption{Analytical route: tangential shear in the middle redshift slice
-$\zob \in [0.35, 0.50)$ for each richness bin. Blue circles: $\gamma_t$
+$\zob \in [0.37, 0.50)$ for each richness bin. Blue circles: $\gamma_t$
 from the unweighted C19-binned $\Delta\Sigma$ stack (no correction). Red
 squares: same stack multiplied by $\Bcal_{\rm sel,C1}^{\Delta\Sigma}(R)$.
 The C1 correction lifts the data vector by $\sim 5\text{--}15\%$
@@ -534,7 +544,7 @@ must reproduce.
 \centering
 \includegraphics[width=0.95\linewidth]{../output/figs/07_empirical_shear.png}
 \caption{Empirical route: per-bin tangential shear in the middle redshift
-slice $\zrm \in [0.35, 0.50)$. Blue circles: $\gamma_t$ from the
+slice $\zrm \in [0.37, 0.50)$. Blue circles: $\gamma_t$ from the
 mass-matched random reference. Red squares: $\gamma_t$ from the
 $\lrm$-selected stack (the observed signal). The selected curve sits
 above the reference by the $\Bsel^{\rm emp}(R)$ factor of
