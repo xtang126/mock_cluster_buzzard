@@ -32,34 +32,42 @@ Saved by the final notebook cell to `output/MockDataVector.npz`. With
 $N_\lambda = 4$, $N_z = 3$, $N_R = 11$ (DES Y1 boost-factor R grid,
 $0.166$ to $15.80$ Mpc):
 
-| key                  | shape          | meaning                                                            |
-|----------------------|----------------|--------------------------------------------------------------------|
-| `NC`                 | $(4, 3)$       | $N(\lambda^\mathrm{ob}, z^\mathrm{ob})$, Buzzard counts rescaled by $\Omega_\mathrm{Y1}(z)$ |
-| `gamma_t_stack_C19`  | $(4, 3, 11)$   | analytical: stacked $\gamma_t$, no correction                     |
-| `gamma_t_obs_C1`     | $(4, 3, 11)$   | analytical: stack $\times \mathcal{B}^{\Delta\Sigma}_\mathrm{C1}$ |
-| `B_sel_C1`           | $(4, 3, 11)$   | analytical: $\mathcal{B}^{\Delta\Sigma}_\mathrm{C1}(R)$           |
-| `gamma_t_stack_RM`   | $(4, 3, 11)$   | empirical: $(\log M, z)$-matched random reference                 |
-| `gamma_t_obs_RM`     | $(4, 3, 11)$   | empirical: redMaPPer-selected stack                               |
-| `B_sel_emp`          | $(4, 3, 11)$   | empirical: bootstrap-mean $\mathcal{B}_\mathrm{sel}^\mathrm{emp}(R)$ |
-| `B_data`              | $(4, 3, 11)$    | DES Y1 measured boost factor $B(R)$                              |
-| `B_data_err`          | $(4, 3, 11)$    | 1-$\sigma$ error per radial bin                                  |
-| `B_data_cov`          | $(4, 3, 11, 11)$| full radial covariance matrix per bin                            |
-| `gamma_t_mock_obs_C1` | $(4, 3, 11)$    | analytical (Matteo) shear with Y1 boost dilution                 |
-| `gamma_t_mock_obs_RM` | $(4, 3, 11)$    | empirical (Heidi) shear with Y1 boost dilution                   |
+| key                    | shape          | meaning                                                          |
+|------------------------|----------------|------------------------------------------------------------------|
+| `NC`                   | $(4, 3)$       | $N(\lambda^\mathrm{ob}, z^\mathrm{ob})$, Buzzard counts rescaled by $\Omega_\mathrm{Y1}(z)$ |
+| `NC_cov`               | $(12, 12)$     | diagonal Poisson covariance of `NC`                              |
+| `gamma_t_stack_C19`    | $(4, 3, 11)$   | analytical: stacked $\gamma_t$, no correction                    |
+| `gamma_t_obs_C1`       | $(4, 3, 11)$   | analytical: stack $\times \mathcal{B}^{\Delta\Sigma}_\mathrm{C1}$ |
+| `B_sel_C1`             | $(4, 3, 11)$   | analytical: $\mathcal{B}^{\Delta\Sigma}_\mathrm{C1}(R)$          |
+| `shear_C19_stack_cov`  | $(4, 3, 11, 11)$| jackknife covariance of `gamma_t_stack_C19` (§8.3)              |
+| `gamma_t_stack_RM`     | $(4, 3, 11)$   | empirical: $(\log M, z)$-matched random reference                |
+| `gamma_t_obs_RM`       | $(4, 3, 11)$   | empirical: redMaPPer-selected stack                              |
+| `B_sel_emp`            | $(4, 3, 11)$   | empirical: bootstrap-mean $\mathcal{B}_\mathrm{sel}^\mathrm{emp}(R)$ |
+| `shear_data_vector_cov`| $(4, 3, 11, 11)$| jackknife covariance of `gamma_t_obs_RM` (§8.3)                 |
+| `B_data`               | $(4, 3, 11)$   | DES Y1 measured boost factor $B(R)$                              |
+| `B_data_err`           | $(4, 3, 11)$   | $1\sigma$ error per radial bin                                  |
+| `B_data_cov`           | $(4, 3, 11, 11)$| full radial covariance per bin                                  |
+| `gamma_t_mock_obs_C1`  | $(4, 3, 11)$   | analytical route $\times \mathcal{B}^{\Delta\Sigma}_\mathrm{C1} / B_\mathrm{data}$ |
+| `gamma_t_mock_obs_RM`  | $(4, 3, 11)$   | empirical route $/ B_\mathrm{data}$                             |
 
 Plus bin metadata: `radii_phys_mpc`, `lambda_bins`, `z_bin_min`, `z_bin_max`.
 
 The headline plots are also written to `output/figs/` as PNGs and embedded
 in `docs/MockDataVector.pdf`.
 
-## Binning (DES Y1)
+## Cosmology & binning (DES Y1)
 
-Both number counts and the lensing data vector use the DES Y1 cluster
-binning (Costanzi+2019, McClintock+2019):
+Cosmology is the Buzzard $\Lambda$CDM (DeRose+2019, arXiv:1901.02401):
+`FlatLambdaCDM(H0=70, Om0=0.286, Ob0=0.046, Tcmb0=2.725)`, with $\sigma_8 = 0.82$,
+$n_s = 0.96$ passed to `hmf` in §6.
 
-- `LBDBINS   = [20, 30, 45, 60, 500]` (4 richness bins; the 500 caps
-  $[60, \infty)$).
-- `ZMIN_LIST = [0.20, 0.35, 0.50]`, `ZMAX_LIST = [0.35, 0.50, 0.65]`.
+Counts and lensing share the DES Y1 cluster binning (Costanzi+2019,
+McClintock+2019):
+
+- `LBDBINS = [20, 30, 45, 60, 500]` (4 richness bins; `500` caps $[60, \infty)$).
+- `ZMIN_LIST = [0.20, 0.37, 0.50]`, `ZMAX_LIST = [0.33, 0.50, 0.65]` — the
+  inner edges are pulled to 0.33/0.37 (from a nominal 0.35) to skip the Buzzard
+  $0.33 \le z \le 0.37$ box-junction seam, dropped at halo-load time.
 
 Halo selection mirrors `0-MakeMock.ipynb`: `pid == -1`, $0 \le \cos i \le 1$,
 drop the Buzzard $0.33 \le z < 0.37$ box seam, then require
@@ -94,16 +102,18 @@ are loaded as the posterior mean of the 15 rows in
 | §3 | Sample $\lambda_\mathrm{true}$ from C26 Eq. 15 |
 | §4 | Project $\lambda_\mathrm{true} \to \lambda_\mathrm{obs}$ via C19 Eq. 6 mixture |
 | §4.5 | Stacked $\Sigma$ in $\lambda^\mathrm{tr}$ vs $\lambda^\mathrm{ob}$ bins (mass-dilution diagnostic) |
-| §5 | Output 1 — $N(\lambda_\mathrm{obs}, z_\mathrm{obs})$ |
+| §5 | Output 1 — $N(\lambda_\mathrm{obs}, z)$ |
 | §5.5 | Sanity: C19 sampler $\lambda^\mathrm{ob}$ vs catalog `LAMBDA_CHISQ` |
-| §6 | Halo mass function: Buzzard vs analytical Tinker08 |
+| §6 | Halo mass function: Buzzard vs analytical Tinker08 (Bryan–Norman virial) |
 | **§7** | **Lensing data vector — ANALYTICAL route (C26 Eq. C1)** |
 | §7.1 | Selection-bias ratio $\mathcal{B}^{\Delta\Sigma}_\mathrm{C1}(R)$ |
 | §7.2 | Tangential shear, with vs without C1 correction |
-| §7.3 | Boost factor $B(R)$ from DES Y1 measurements; final mock-observed shear |
+| §7.3 | Boost factor $B(R)$ — McClintock+2019 parametric fit (sanity) |
+| §7.3.bis | Boost factor $B(R)$ — measured DES Y1 profiles; **saved** mock-observed shear |
 | **§8** | **Lensing data vector — EMPIRICAL route (mass-matched ratio)** |
 | §8.1 | Selection-bias ratio $\mathcal{B}_\mathrm{sel}^\mathrm{emp}(R)$ with bootstrap bands; null test |
 | §8.2 | Tangential shear: redMaPPer-selected vs mass-matched random |
+| §8.3 | Shear-stack covariance via spatial jackknife ($K=50$ KMeans patches) |
 | §9 | Save the data vector to `output/MockDataVector.npz` |
 
 ## How to run
@@ -174,13 +184,14 @@ Repo-local:
 ## References
 
 - Costanzi et al. 2026, *Forward analytical model for the optical selection
-  bias on galaxy cluster lensing profiles* (C26). Eqs. 15 (mass–richness),
+  bias on galaxy cluster lensing profiles* (C26). Eq. 15 (mass–richness),
   Appendix C Eq. C1 (selection-bias fit), Sec. III (Poisson–Gaussian
   convolution).
 - Costanzi et al. 2019, arXiv:1807.07072. Eq. 6 (Gaussian + EMG mixture),
   Appendix A Eq. A8 (per-parameter forms).
-- Wu et al. 2022, arXiv:2203.05416. Fig. 2 (selection-bias panel grid)
-  and Appendix B (mass–redshift weighted reference).
-- `MCostanzi/SelectionBias` — upstream reference notebook and the
-  `prj_params_DESY3_lss_lin_dep_getdist_v1.txt` parameter file.
+- Wu et al. 2022, arXiv:2203.05416. Fig. 2 (selection-bias grid), Appendix B
+  (mass–redshift weighted reference).
+- DeRose et al. 2019, arXiv:1901.02401. Buzzard cosmology and catalog.
+- McClintock et al. 2019, arXiv:1805.00039. DES Y1 boost-factor profiles.
+- `MCostanzi/SelectionBias` — upstream reference notebook + projection-param file.
 - `0-MakeMock.ipynb` — Buzzard halo selection recipe (mirrored).
