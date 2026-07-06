@@ -76,9 +76,10 @@ This document is the technical reference for
 \modname{MockDataVector.ipynb}: a Buzzard-halo DES~Y3-like cluster
 mock that layers the Costanzi+2026 (C26) optical selection systematics on
 top of the raw simulation outputs, on the DES~Y1 cluster binning
-($\lambda \in \{20, 30, 45, 60, \infty\}$, $z \in \{[0.20, 0.33),\,
-[0.37, 0.50),\, [0.50, 0.65)\}$ — the standard DES~Y1 redshift edges
-with the upper edge of $z_0$ pulled in from $0.35 \to 0.33$ and the
+($\lambda \in \{20, 30, 45, 60, \infty\}$,
+$z \in \{[0.20, 0.33),\allowbreak\,
+[0.37, 0.50),\allowbreak\, [0.50, 0.65)\}$, which are the
+standard DES~Y1 redshift edges with the upper edge of $z_0$ pulled in from $0.35 \to 0.33$ and the
 lower edge of $z_1$ pushed out from $0.35 \to 0.37$ to skip the
 Buzzard $0.33 \le z < 0.37$ box-junction seam). The data vector is constructed along
 \emph{two parallel routes} that share the same Costanzi+2019 (C19) forward model upstream
@@ -111,8 +112,9 @@ The notebook executes the following stages in order:
 \modname{halo\_load} $\to$ \modname{photoz\_proxy} $\to$
 \modname{sample\_lambda\_true} $\to$ \modname{sample\_lambda\_obs} $\to$
 \modname{lensing\_inputs} $\to$ \modname{number\_counts} $\to$
-\modname{analytical\_C1} $\to$ \modname{empirical\_mass\_match} $\to$
-\modname{save\_npz}}}
+\modname{analytical\_C1} $\to$ \modname{boost\_factor} $\to$ 
+\modname{empirical\_mass\_match} $\to$
+\modname{jackknife\_covariance} $\to$ \modname{save\_npz}}}
 \end{center}
 
 The first four stages are the C19 forward model: select host halos above
@@ -124,14 +126,14 @@ $\Sigma_{\rm crit}^{-1}$ table, plus the catalog redMaPPer columns
 ($\texttt{LAMBDA\_CHISQ}, \texttt{Z\_LAMBDA}$) used by the empirical route.
 The two lensing-data-vector stages are independent and produce their
 outputs on the same DES~Y1 binning so the user can compare them
-side-by-side. The final stage persists everything to
+side-by-side. After implementing the boost factor and calculating the covariance matrices, the final stage persists everything to
 \pyfile{output/MockDataVector.npz}.
 
 % ============================================================================
 \section{Shared conventions}
 \label{sec:conventions}
 
-\paragraph{Cosmology.} \texttt{FlatLambdaCDM(H0=70, Om0=0.3, Ob0=0.046,
+\paragraph{Cosmology.} \texttt{FlatLambdaCDM(H0=70, Om0=0.286, Ob0=0.046,
 Tcmb0=2.725)} via \texttt{astropy.cosmology}, matching the Buzzard
 simulation cosmology used by the upstream halo catalogue.
 
@@ -314,6 +316,11 @@ vector in the same C26/C19 model world. $N(\lob, \zob)$ is therefore the
 correct entry for a C26 likelihood integrating
 Eq.~\ref{eq:lsat} into Eq.~\ref{eq:c19-eq6}.
 
+We also compute the covariance matrix for the number counts by only considering the Poisson noise of the counts in each bin, which is a diagonal matrix with
+\begin{equation}
+  \mathrm{Cov}[N(\lob, \zob)]_{ii} = \sqrt{N(\lob, \zob)_i}.
+\end{equation}.
+
 % ============================================================================
 \section{Lensing data vector --- ANALYTICAL route (Matteo / C26 Eq.~C1)}
 \label{sec:c1}
@@ -444,6 +451,8 @@ rises with richness and falls with redshift, as expected for a
 red-sequence-driven member contamination.}
 \label{fig:boost-data}
 \end{figure}
+
+We
 
 % ============================================================================
 \section{Lensing data vector --- EMPIRICAL route (Heidi / mass-matched ratio)}
@@ -657,6 +666,8 @@ counts and $(4, 3, 15)$ for the radial vectors.}
 
 \begin{itemize}
   \setlength\itemsep{1pt}
+  \item The Buzzard mock catalogues are described in DeRose et al.\ 2019, ApJS 242, 8.
+  \item The parameters for the scaling relations in Eq.~\ref{eq:lsat} and projection in Eq.~\ref{eq:c19-a8} are taken from \href{https://github.com/MCostanzi/SelectionBias}{https://github.com/MCostanzi/SelectionBias}.
   \item Costanzi et al.\ 2026, \emph{Forward analytical model for the
     optical selection bias on galaxy cluster lensing profiles}.
     Eqs.~15 (mass--richness), Appendix~C Eq.~C1 (selection-bias fit),
