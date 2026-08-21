@@ -34,6 +34,8 @@ $0.166$ to $15.80$ Mpc):
 
 | key                    | shape          | meaning                                                          |
 |------------------------|----------------|------------------------------------------------------------------|
+| `scinv_bin`            | $(4, 3)$       | $\Sigma_\mathrm{crit}^{-1}(\langle z^\mathrm{ob}\rangle_\mathrm{bin})$ [$\mathrm{pc}^2/M_\odot$]; lets `gamma_t_mock_obs_*` be inverted to $\Delta\Sigma$ without replaying the forward model |
+| `z_rep`                | $(4, 3)$       | bin-mean $\langle z^\mathrm{ob}\rangle$ used to evaluate `scinv_bin` |
 | `NC`                   | $(4, 3)$       | $N(\lambda^\mathrm{ob}, z^\mathrm{ob})$, Buzzard counts rescaled by $\Omega_\mathrm{Y1}(z)$ |
 | `NC_cov`               | $(12, 12)$     | diagonal Poisson covariance of `NC`                              |
 | `gamma_t_stack_C19`    | $(4, 3, 11)$   | analytical: stacked $\gamma_t$, no correction                    |
