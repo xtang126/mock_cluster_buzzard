@@ -582,6 +582,13 @@ Key & Shape & Content \\
 \blk{z\_bin\_min}         & $(N_z,)$               & lower-redshift edges \\
 \blk{z\_bin\_max}         & $(N_z,)$               & upper-redshift edges \\
 \midrule
+\multicolumn{3}{l}{\textit{Lensing geometry, C19/analytical route only (\S\ref{sec:units})}}    \\
+\blk{scinv\_bin\_C19}         & $(N_\lambda, N_z)$     & $\Sigma_{\rm crit}^{-1}(\langle\zob\rangle_{\rm bin})$, physical [$\mathrm{pc}^2/M_\odot$] \\
+\blk{z\_rep\_C19}             & $(N_\lambda, N_z)$     & bin-mean $\langle\zob\rangle$ used to evaluate \blk{scinv\_bin\_C19} \\
+\blk{h\_buzzard}              & scalar                 & Buzzard's fixed $h = 0.70$ (DeRose+2019) \\
+\blk{scinv\_bin\_C19\_littleh} & $(N_\lambda, N_z)$    & $\Sigma_{\rm crit}^{-1}$, little-h [$\mathrm{pc}^2/(h\,M_\odot)$] $= \blk{scinv\_bin\_C19}/\blk{h\_buzzard}$ \\
+\blk{radii\_cMpc\_h\_C19}     & $(N_\lambda, N_z, N_R)$ & comoving $\hMpc$ coordinate of \blk{radii\_phys\_mpc}, per bin \\
+\midrule
 \multicolumn{3}{l}{\textit{Number counts (DES~Y1 expectation)}}                                 \\
 \blk{NC}                  & $(N_\lambda, N_z)$     & $N(\lob, \zob)$, Buzzard counts rescaled by $\Omega_{\rm Y1}(z)$ \\
 \midrule
@@ -607,6 +614,35 @@ Key & Shape & Content \\
 counts and $(4, 3, 15)$ for the radial vectors.}
 \label{tab:archive}
 \end{table}
+
+\subsection{Units and the $h$-convention}
+\label{sec:units}
+
+Every \blk{gamma\_t\_*} array is dimensionless
+($\gamma_t = \Delta\Sigma \times \Sigma_{\rm crit}^{-1}$) and computed
+self-consistently in physical units throughout, so it never needs an
+$h$-conversion and is identical regardless of which \blk{scinv\_bin\_C19*}
+convention below it is paired with:
+\begin{itemize}
+  \setlength\itemsep{2pt}
+  \item \textbf{Physical} (\blk{radii\_phys\_mpc}, \blk{scinv\_bin\_C19}):
+    proper Mpc and $\mathrm{pc}^2/M_\odot$, at Buzzard's fixed cosmology
+    $h = 0.70$. This is an absolute-unit quantity, not a
+    little-$h$-parametrized one --- Buzzard's cosmology is not a free
+    parameter of the mock.
+  \item \textbf{Little-$h$} (\blk{radii\_cMpc\_h\_C19},
+    \blk{scinv\_bin\_C19\_littleh}): the standard weak-lensing convention,
+    comoving $\hMpc$ and $\mathrm{pc}^2/(h\,M_\odot)$.
+    \blk{gamma\_t\_mock\_obs\_C1} $/$ \blk{scinv\_bin\_C19\_littleh}
+    recovers $\Delta\Sigma$ directly in $h\,M_\odot/\mathrm{pc}^2$.
+\end{itemize}
+Both \blk{*\_C19} fields are valid \emph{only} for the analytical/Matteo
+route (\blk{gamma\_t\_*\_C1}/\blk{gamma\_t\_stack\_C19}) --- the
+empirical/RM route (\blk{gamma\_t\_*\_RM}) uses its own internal bin-mean
+redshift from the redMaPPer catalog (\S\ref{sec:emp}) that is not
+currently exposed in the archive. \pyfile{output/MockDataVector\_targetR.npz}
+(a separate, secondary artifact) is not covered by either convention above
+and remains in its previous, unconverted physical-Mpc convention.
 
 % ============================================================================
 \section{Known simplifications}

@@ -34,8 +34,11 @@ $0.166$ to $15.80$ Mpc):
 
 | key                    | shape          | meaning                                                          |
 |------------------------|----------------|------------------------------------------------------------------|
-| `scinv_bin`            | $(4, 3)$       | $\Sigma_\mathrm{crit}^{-1}(\langle z^\mathrm{ob}\rangle_\mathrm{bin})$ [$\mathrm{pc}^2/M_\odot$]; lets `gamma_t_mock_obs_*` be inverted to $\Delta\Sigma$ without replaying the forward model |
-| `z_rep`                | $(4, 3)$       | bin-mean $\langle z^\mathrm{ob}\rangle$ used to evaluate `scinv_bin` |
+| `scinv_bin_C19`        | $(4, 3)$       | $\Sigma_\mathrm{crit}^{-1}(\langle z^\mathrm{ob}\rangle_\mathrm{bin})$ [$\mathrm{pc}^2/M_\odot$], physical; lets `gamma_t_mock_obs_C1`/`gamma_t_stack_C19`/`gamma_t_obs_C1` be inverted to $\Delta\Sigma$ without replaying the forward model. **C19/analytical route only** — not self-consistent with the empirical/RM route (see units note below) |
+| `z_rep_C19`            | $(4, 3)$       | bin-mean $\langle z^\mathrm{ob}\rangle$ used to evaluate `scinv_bin_C19`. C19/analytical route only |
+| `h_buzzard`             | scalar         | Buzzard's fixed $h = 0.70$ (DeRose+2019); tag so downstream code never hardcodes it |
+| `scinv_bin_C19_littleh`| $(4, 3)$       | $\Sigma_\mathrm{crit}^{-1}$ in the little-h convention, $\mathrm{pc}^2/(h\,M_\odot)$ = `scinv_bin_C19 / h_buzzard`. Dividing the (unchanged, dimensionless) `gamma_t_mock_obs_C1` by this recovers $\Delta\Sigma$ directly in $h\,M_\odot/\mathrm{pc}^2$ |
+| `radii_cMpc_h_C19`     | $(4, 3, 11)$   | comoving Mpc/h coordinate of each of the 11 `radii_phys_mpc` points, per bin: `radii_phys_mpc * (1+z_rep_C19) * h_buzzard`. A coordinate relabeling of the same points `gamma_t_mock_obs_C1` is already indexed by — not a re-grid |
 | `NC`                   | $(4, 3)$       | $N(\lambda^\mathrm{ob}, z^\mathrm{ob})$, Buzzard counts rescaled by $\Omega_\mathrm{Y1}(z)$ |
 | `NC_cov`               | $(12, 12)$     | diagonal Poisson covariance of `NC`                              |
 | `gamma_t_stack_C19`    | $(4, 3, 11)$   | analytical: stacked $\gamma_t$, no correction                    |
@@ -53,6 +56,29 @@ $0.166$ to $15.80$ Mpc):
 | `gamma_t_mock_obs_RM`  | $(4, 3, 11)$   | empirical route $/ B_\mathrm{data}$                             |
 
 Plus bin metadata: `radii_phys_mpc`, `lambda_bins`, `z_bin_min`, `z_bin_max`.
+
+### Units & h-convention
+
+All `gamma_t_*` arrays are dimensionless ($\gamma_t = \Delta\Sigma \times
+\Sigma_\mathrm{crit}^{-1}$) computed self-consistently in physical units
+throughout — they never need an h-conversion and are identical regardless
+of which convention below you read `scinv_bin_C19`/`radii_phys_mpc` in.
+
+- **Physical** (`radii_phys_mpc`, `scinv_bin_C19`): proper Mpc and
+  $\mathrm{pc}^2/M_\odot$, at Buzzard's fixed cosmology $h = 0.70$. This is
+  an absolute-unit quantity, not a little-h-parametrized one — Buzzard's
+  cosmology isn't a free parameter of the mock.
+- **Little-h** (`radii_cMpc_h_C19`, `scinv_bin_C19_littleh`): the standard
+  weak-lensing convention, comoving Mpc/h and $\mathrm{pc}^2/(h\,M_\odot)$.
+  `gamma_t_mock_obs_C1 / scinv_bin_C19_littleh` recovers $\Delta\Sigma$
+  directly in $h\,M_\odot/\mathrm{pc}^2$.
+- Both `_C19` fields are valid **only** for the analytical/Matteo route
+  (`gamma_t_*_C1`/`gamma_t_stack_C19`) — the empirical/RM route
+  (`gamma_t_*_RM`) uses its own internal bin-mean redshift (from the
+  redMaPPer catalog, §8.2) that isn't currently exposed in the npz.
+- `output/MockDataVector_targetR.npz` (a separate, secondary artifact) is
+  **not** covered by any of the above and remains in its previous,
+  unconverted physical-Mpc convention.
 
 The headline plots are also written to `output/figs/` as PNGs and embedded
 in `docs/MockDataVector.pdf`.
