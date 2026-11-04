@@ -78,11 +78,12 @@ This document is the technical reference for
 mock that layers the Costanzi+2026 (C26) optical selection systematics on
 top of the raw simulation outputs, on the DES~Y1 cluster binning
 ($\lambda \in \{20, 30, 45, 60, \infty\}$,
-$z \in \{[0.20, 0.33),\allowbreak\,
+$z \in \{[0.20, 0.322),\allowbreak\,
 [0.37, 0.50),\allowbreak\, [0.50, 0.65)\}$, which are the
-standard DES~Y1 redshift edges with the upper edge of $z_0$ pulled in from $0.35 \to 0.33$ and the
+standard DES~Y1 redshift edges with the upper edge of $z_0$ pulled in from $0.35 \to 0.322$ and the
 lower edge of $z_1$ pushed out from $0.35 \to 0.37$ to skip the
-Buzzard $0.33 \le z < 0.37$ box-junction seam). The data vector is constructed along
+Buzzard $0.33 \le z < 0.37$ box-junction seam and the incomplete
+$0.322 \le z < 0.33$ slice of the profile catalog). The data vector is constructed along
 \emph{two parallel routes} that share the same Costanzi+2019 (C19) forward model upstream
 and the same lensing geometry: an \textbf{analytical} closure based on the
 C26 Appendix~C Eq.~C1 fitting function applied to the C19-binned stack
@@ -160,13 +161,18 @@ the $0.33 \le z < 0.37$ simulation-box seam, then require $0.20 \le \ztr
 
 \paragraph{DES~Y1 binning (used everywhere).} Both abundance and lensing
 bins follow the DES~Y1 cluster edges (Costanzi+2019, McClintock+2019),
-with the central two redshift edges shifted inward by $\pm 0.02$ to
-skip the Buzzard box-junction seam at $0.33 \le z < 0.37$:
+with the central two redshift edges shifted to skip the Buzzard
+box-junction seam at $0.33 \le z < 0.37$:
 \begin{equation*}
   \texttt{LBDBINS}    = \{20,\, 30,\, 45,\, 60,\, 500\},\qquad
   \texttt{ZMIN\_LIST} = \{0.20,\, 0.37,\, 0.50\},\qquad
-  \texttt{ZMAX\_LIST} = \{0.33,\, 0.50,\, 0.65\}.
+  \texttt{ZMAX\_LIST} = \{0.322,\, 0.50,\, 0.65\}.
 \end{equation*}
+The $z_0$ upper edge is $0.322$, not $0.33$: in the profile catalog
+(\texttt{buzzard-1.9.8\_3y3a\_run\_halos\_profiles.fit}) 59\% of halos with
+$0.322 \le z < 0.33$ have \texttt{pid = -10} (profile not measured) and fail
+the \texttt{pid == -1} cut, so that slice is incomplete (completeness is
+1.000 at every other redshift); ending $z_0$ at $0.322$ removes the gap.
 The $500$ caps the open $[60, \infty)$ richness range. There are
 $N_\lambda \times N_z = 4 \times 3 = 12$ bins. The seam volume is
 $\sim 5\%$ of $z_0$ and $\sim 13\%$ of $z_1$ on the published Y1
@@ -269,8 +275,17 @@ $\ltr$ with $z$-dependent coefficients calibrated from SDSS redMaPPer
 \end{aligned}
 \end{equation}
 The 15 rows of \pyfile{data/prj\_params\_DESY3\_lss\_lin\_dep\_getdist\_v1.txt}
-are interpreted as posterior samples and collapsed to the posterior mean
-via \texttt{load\_prj\_posterior\_mean}.
+are redshift knots on $z = 0.10, 0.15, \dots, 0.80$
+(\texttt{PRJ\_Z\_BINS}), not posterior samples: the coefficients trend
+smoothly with row index ($a_\mu$ runs from $-0.36$ to $-2.69$, Spearman
+$\rho = -0.98$; $b_\sigma$, $b_\mu$ and $b_{f_{\rm prj}}$ also trend), and
+the y3\_cluster\_cpp \texttt{PrjParams} reads the same table on the same
+15-node grid. \texttt{load\_prj\_interpolators} interpolates each
+coefficient linearly in $z$, so the mean projection boost
+$\langle\lob - \ltr\rangle$ rises with redshift (at $\ltr = 45$, from 3.6
+at $z = 0.2$ to 7.6 at $z = 0.65$). Mocks made before 2026-11-01 averaged
+the 15 rows into a single $z$-independent kernel
+(\texttt{load\_prj\_posterior\_mean}, kept only to reproduce them).
 
 The mixture is sampled directly using the EMG = $\mathcal N(\mu,\sigma) +
 \mathrm{Exp}(1/\tau)$ representation, avoiding a closed-form EMG density
@@ -801,10 +816,11 @@ and remains in its previous, unconverted physical-Mpc convention.
     binning. A Y3 boost-factor measurement is not yet released; when
     it is, swap the source files in \pyfile{data/boost\_factor/profiles/}
     without further code change.
-  \item \textbf{Posterior-mean projection coefficients.} The C19
-    projection parameters are evaluated at the posterior mean of the
-    upstream chain. Row-by-row covariance propagation is not
-    implemented.
+  \item \textbf{Fixed projection coefficients.} The C19 projection
+    parameters are fixed at the tabulated redshift-knot values
+    (interpolated linearly in $z$); their uncertainty is not propagated.
+    The kernel is evaluated at the observed redshift of each halo, while
+    the counts are binned on true $z$.
   \item \textbf{Single Y3 realisation.} The §8.1 empirical ratio is
     computed on one Y3 realisation; Wu+2022 averages 12 Y1 + 1 Y3
     realisations and is correspondingly tighter.
@@ -837,12 +853,17 @@ and remains in its previous, unconverted physical-Mpc convention.
     convolution, enclosed-mass re-derivation, and the
     $\Bmis^{\Delta\Sigma}(R)$/$\Bmis^{\Sigma}(R)$ bias ratios.
   \item \pyfile{data/prj\_params\_DESY3\_lss\_lin\_dep\_getdist\_v1.txt}
-    --- 15 posterior samples of the 10 C19 projection coefficients.
+    --- the 10 C19 projection coefficients at 15 redshift knots
+    ($z = 0.10$--$0.80$).
   \item \pyfile{src/fileLoc.py} --- machine-resolved path table for the
     raw Buzzard halo catalogue, profile output, and $\beta_{\rm eff}$
     table.
   \item \pyfile{output/MockDataVector.npz} --- saved data vector
     (Tab.~\ref{tab:archive}).
+  \item \pyfile{output/MockDataVector\_pipeline.npz} --- the same counts
+    plus $\Delta\Sigma$ stacked on the y3\_cluster\_cpp comoving radial
+    grid with a 50-patch jackknife covariance, in the
+    \texttt{likelihood\_cp} layout (keys listed in the README).
   \item \pyfile{output/figs/} --- headline plots embedded in this PDF.
   \item \pyfile{docs/MockDataVector.tex} --- this document.
 \end{itemize}
